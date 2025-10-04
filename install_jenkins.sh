@@ -1,54 +1,24 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# Simple script to install Jenkins on Ubuntu
 
-LOGFILE="/var/log/install_jenkins.log"
-exec > >(tee -a "$LOGFILE") 2>&1
+set -e  # Exit immediately if a command exits with a non-zero status
 
-# require sudo/root
-if [ "$(id -u)" -ne 0 ]; then
-  echo "This script must be run as root (sudo). Exiting."
-  exit 1
-fi
+echo "=== Adding Jenkins repository key ==="
+sudo mkdir -p /etc/apt/keyrings
+sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian/jenkins.io-2023.key
 
-export DEBIAN_FRONTEND=noninteractive
+echo "=== Adding Jenkins repository ==="
+echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
 
-echo "----- $(date) : Updating packages -----"
-apt update -y
-apt upgrade -y
+echo "=== Updating package list ==="
+sudo apt-get update -y
 
-echo "----- $(date) : Installing OpenJDK 17 -----"
-apt install -y openjdk-17-jdk
+echo "=== Installing Java (OpenJDK 17) ==="
+sudo apt-get install -y fontconfig openjdk-17-jre
 
-echo "Java version:"
-java -version || true
+echo "=== Installing Jenkins ==="
+sudo apt-get install -y jenkins
 
-echo "----- $(date) : Adding Jenkins repo key & source -----"
-curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key \
-  | tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
-
-echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" \
-  | tee /etc/apt/sources.list.d/jenkins.list > /dev/null
-
-echo "----- $(date) : Installing Jenkins -----"
-apt update -y
-apt install -y jenkins
-
-echo "----- $(date) : Enabling & starting Jenkins -----"
-systemctl enable --now jenkins
-
-echo "----- $(date) : Firewall (UFW) - allow 8080 if ufw exists -----"
-if command -v ufw >/dev/null 2>&1; then
-  ufw allow 8080/tcp || true
-fi
-
-echo "----- $(date) : Final status -----"
-systemctl status jenkins --no-pager || true
-
-echo "Initial admin password (if present):"
-if [ -f /var/lib/jenkins/secrets/initialAdminPassword ]; then
-  cat /var/lib/jenkins/secrets/initialAdminPassword
-else
-  echo "Password file not found yet; check later."
-fi
-
-echo "Install finished. Check $LOGFILE for details."
+echo "=== Jenkins installation complete! ==="
+echo "You can start Jenkins with: sudo systemctl start jenkins"
+echo "Then check status using: sudo systemctl status jenkins"
